@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: CC-BY-NC-SA-4.0
+# Derived from HiddifyPanel v12.3.3 (cf2e60de038c7d658d2bf4b2d84c7b433e3c918d).
+# Clash 订阅国内直连规则 (私网/cn/中国IP 直连, 国内网站不再走代理)
+# 同时修复 Hiddify 模板 bug: country=zh 时 rule-provider 名 geoip_zh 与 rules 引用 geoip_cn 不匹配
+# 保持 country=UN (避免生成依赖 GitHub 的 geoip rule-provider)
+
+--- a/hiddifypanel/panel/user/templates/clash_config.yml	2026-08-29 00:00:00.000000000 +0330
++++ b/hiddifypanel/panel/user/templates/clash_config.yml	2026-08-29 00:00:00.000000000 +0330
+@@ -136,7 +136,7 @@
+ #   %endfor
+ rule-providers:
+ {% if hconfig(ConfigEnum.country) in ["ir","zh","ru"] %}
+-  geoip_{{hconfig(ConfigEnum.country)}}:
++  geoip_{{hconfig(ConfigEnum.country)|replace('zh', 'cn')}}:
+     type: http
+     behavior: classical
+     url: "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/classical/{{hconfig(ConfigEnum.country)|replace('zh', 'cn')}}.yaml"
+@@ -191,6 +191,15 @@
+   #   interval: 432000   
+ 
+ rules:
++  # --- 国内直连规则 (patch, Hiddify 升级后需重打) ---
++  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
++  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
++  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
++  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
++  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
++  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
++  - DOMAIN-SUFFIX,cn,DIRECT
++  - GEOIP,CN,DIRECT
+   - DOMAIN,{{hconfigs[ConfigEnum.telegram_fakedomain]}},DIRECT
+   # - DOMAIN,{{domain}},DIRECT
+   # - DOMAIN,{{direct_host}},DIRECT

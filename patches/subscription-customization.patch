@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: CC-BY-NC-SA-4.0
+# Derived from HiddifyPanel v12.3.3 (cf2e60de038c7d658d2bf4b2d84c7b433e3c918d).
+# 订阅名称读取 Hiddify branding_title；客户端建议每 24 小时更新。
+
+--- a/hiddifypanel/panel/user/user.py	2026-08-29 00:00:00.000000000 +0330
++++ b/hiddifypanel/panel/user/user.py	2026-08-29 00:00:00.000000000 +0330
+@@ -455,8 +455,10 @@
+ 
+     if hconfig(ConfigEnum.branding_site):
+         resp.headers['support-url'] = hconfig(ConfigEnum.branding_site)
+-    resp.headers['profile-update-interval'] = 1
+-    # resp.headers['content-disposition']=f'attachment; filename="{c["db_domain"].alias or c["db_domain"].domain} {c["user"].name}"'
++    resp.headers['profile-update-interval'] = 24
++    # --- 自定义订阅名 patch (Hiddify 升级后需重打) ---
++    _profile_title = hconfig(ConfigEnum.branding_title) or c["user"].name
++    resp.headers.set('Content-Disposition', 'attachment', filename=_profile_title)
+ 
+-    resp.headers['profile-title'] = 'base64:' + hutils.encode.do_base_64(c['profile_title'])
++    resp.headers['profile-title'] = 'base64:' + hutils.encode.do_base_64(_profile_title)
+ 

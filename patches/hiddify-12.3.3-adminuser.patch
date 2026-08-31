@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: CC-BY-NC-SA-4.0
+# Derived from HiddifyPanel v12.3.3 (cf2e60de038c7d658d2bf4b2d84c7b433e3c918d).
+# Hiddify v12.3.3 AdminUser bug 修复
+# 症状: 面板 HTTP 500: AttributeError: 'AdminUser' object has no attribute 'remaining_days' (随后依次 usage_limit_GB / ed25519_private_key)
+# 应用: cd <venv>/lib/python3.13/site-packages && patch -p1 < 本文件
+# 验证: curl --fail --show-error https://DOMAIN/ADMIN_PATH/  (替换后严格校验 TLS)
+
+--- a/hiddifypanel/models/admin.py	2026-08-29 00:00:00.000000000 +0330
++++ b/hiddifypanel/models/admin.py	2026-08-29 00:00:00.000000000 +0330
+@@ -26,6 +26,46 @@
+ 
+ 
+ class AdminUser(BaseAccount):
++    # --- 兼容 User 接口的属性（管理员: 无限流量、长期有效、活跃）---
++    @property
++    def usage_limit_GB(self):
++        return 0
++
++    @property
++    def current_usage_GB(self):
++        return 0
++
++    @property
++    def remaining_days(self):
++        return 3650
++
++    @property
++    def is_active(self):
++        return True
++
++    def days_to_reset(self):
++        return 1000
++
++    @property
++    def ed25519_private_key(self):
++        return ""
++
++    @property
++    def ed25519_public_key(self):
++        return ""
++
++    @property
++    def wg_pk(self):
++        return ""
++
++    @property
++    def wg_pub(self):
++        return ""
++
++    @property
++    def wg_psk(self):
++        return ""
++
+     """
+     This is a model class for a user in a database that includes columns for their ID, UUID, name, online status,
+     account expiration date, usage limit, package days, mode, start date, current usage, last reset time, and comment.

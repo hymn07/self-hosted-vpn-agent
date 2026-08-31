@@ -1,0 +1,18 @@
+# 本地部署状态（含真实 IP/UUID/密钥，绝不入库）
+.local/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# SSH 私钥
+*.pem
+*.key
+
+# 日志
+*.log
+
+# Python / lint 缓存
+__pycache__/
+*.py[cod]
+.ruff_cache/

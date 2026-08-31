@@ -1,0 +1,57 @@
+# 部署参数模板
+# Agent 必须先把默认方案一次性告知用户；用户确认后复制到 .local/deployment.yaml。
+# 此后的配置、验证和交付全部读取 .local/deployment.yaml，不修改 tracked 文件。
+
+provider: aws_lightsail
+
+server:
+  ip: ""                       # 用户创建并绑定 Static IP 后填写
+  ssh_user: ubuntu
+  ssh_key_path: ""             # Agent 本机的 .pem 路径；不得上传或提交
+
+instance:
+  region: us-west-2             # 默认：美国西部（俄勒冈）
+  name: vpn-server
+  plan_label: 1GB-2TB
+  memory_gb: 1
+  monthly_transfer_gb: 2000     # 必须按所选区域/套餐在 AWS 控制台显示值更新
+  monthly_cost_usd: 7
+
+hiddify:
+  version: "12.3.3"             # 当前唯一经过本仓库验证的版本
+
+users:
+  defaults:
+    quota_gb: 500
+    reset_mode: monthly         # monthly / weekly / daily / no_reset
+    validity_days: 3650
+  accounts:
+    - name: user1
+    - name: user2
+    - name: user3
+    # 每个账户都可以覆盖默认值，例如：
+    # - name: user4
+    #   quota_gb: 200
+    #   reset_mode: no_reset
+    #   validity_days: 365
+
+protocols:
+  reality: true
+  hysteria2: true
+
+domain:
+  mode: sslip                  # sslip / custom
+  custom_domain: ""            # mode=custom 时必填，并由用户提前完成 DNS 解析
+
+branding:
+  node_prefix: US              # 可按区域或喜好改为 SG / JP / VPN 等
+  profile_title: Private VPN   # 通用订阅名称；不得写入维护者个人信息
+
+security:
+  disable_password_ssh: true
+  enable_auto_updates: true
+  delete_default_user: true
+  quota_reserve_ratio: 0.10    # 建议至少保留 10% 套餐流量余量
+
+cost_control:
+  budget_usd: 10               # 默认高于 $7 固定月费；仅告警，不自动停止实例

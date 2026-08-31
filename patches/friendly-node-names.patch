@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: CC-BY-NC-SA-4.0
+# Derived from HiddifyPanel v12.3.3 (cf2e60de038c7d658d2bf4b2d84c7b433e3c918d).
+# 订阅节点名模板；前缀读取 Hiddify Domain.alias，由 configure-domain.py 同步。
+
+--- a/hiddifypanel/hutils/proxy/shared.py	2026-08-29 00:00:00.000000000 +0330
++++ b/hiddifypanel/hutils/proxy/shared.py	2026-08-29 00:00:00.000000000 +0330
+@@ -393,5 +393,8 @@
+     base = {
+         **domain_data,
+-        'name': name,
++        # --- 自定义节点名（patch, Hiddify 升级后需重打）---
++        'name': (f'{domain_db.alias or domain_db.domain}-HY2-{domain_db.id}' if proxy.proto == ProxyProto.hysteria2
++                  else f'{domain_db.alias or domain_db.domain}-Reality-{domain_db.id}' if 'reality' in proxy.l3
++                  else name),
+         # 'cdn': is_cdn,
+         # 'mode': "CDN" if is_cdn else "direct",
+@@ -404,7 +407,7 @@
+         'transport': proxy.transport,
+         'proxy_path': hconfigs[ConfigEnum.proxy_path],
+         'alpn': alpn,
+-        'extra_info': f'{domain_db.alias or domain_db.domain}',
++        'extra_info': '',  # 自定义节点名 patch: 去掉域名前缀
+         'fingerprint': hconfigs[ConfigEnum.utls],
+         # 'allow_insecure': domain_db.mode == DomainType.fake or "Fake" in proxy.cdn,
+         'dbe': proxy,
+--- a/hiddifypanel/hutils/proxy/clash.py	2026-08-29 00:00:00.000000000 +0330
++++ b/hiddifypanel/hutils/proxy/clash.py	2026-08-29 00:00:00.000000000 +0330
+@@ -50,7 +50,7 @@
+         return {'name': name, 'msg': "bug tls_h2 vmess and vless in clash meta", 'type': 'warning'}
+     base = {}
+     # vmess ws
+-    base["name"] = f"""{proxy['extra_info']} {proxy["name"]} § {proxy['port']} {proxy["dbdomain"].id}"""
++    base["name"] = proxy["name"]  # 自定义节点名 patch
+     base["type"] = str(proxy["proto"])
+     base["server"] = proxy["server"]
+     base["port"] = proxy["port"]
