@@ -144,6 +144,12 @@ def load_config(path: str | Path, *, runtime: bool = False) -> dict[str, Any]:
     for key in ("disable_password_ssh", "enable_auto_updates", "delete_default_user"):
         if not isinstance(security.get(key), bool):
             raise ConfigError(f"security.{key} 必须是 true/false")
+    swap_size = require_number(
+        security.get("swap_size_gb", 2), "security.swap_size_gb", minimum=0
+    )
+    if not float(swap_size).is_integer():
+        raise ConfigError("security.swap_size_gb 必须是整数")
+    security["swap_size_gb"] = int(swap_size)
     reserve = require_number(
         security.get("quota_reserve_ratio"), "security.quota_reserve_ratio", minimum=0
     )
@@ -260,6 +266,11 @@ def print_summary(cfg: dict[str, Any]) -> None:
     print(f"- 域名: {domain_label}")
     print(f"- 节点前缀: {cfg['branding']['node_prefix']}")
     print(f"- 订阅名称: {cfg['branding']['profile_title'] or '使用账户名'}")
+    print(
+        f"- 资源保护: {cfg['security']['swap_size_gb']:g}GB swap / "
+        f"Ubuntu 自动安全更新: "
+        f"{'开启' if cfg['security']['enable_auto_updates'] else '关闭'}"
+    )
     print(f"- Static IP: {'已填写' if cfg['server']['ip'] else '待填写'}")
     print(f"- SSH 私钥路径: {'已填写' if cfg['server']['ssh_key_path'] else '待填写'}")
 

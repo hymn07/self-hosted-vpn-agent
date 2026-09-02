@@ -1,6 +1,6 @@
 # 故障排查手册（Troubleshooting）
 
-> 以下为实际部署中遇到并验证解决的常见问题。
+> 以下包括实际部署中遇到的问题，以及经核实的版本相关上游问题；未完成本项目回归的上游修复会明确标注。
 
 > Agent 部署遇到问题时查阅；每个问题都有【症状】【根因】【解决】。
 > 原则：**先诊断再动手**；修改前备份；失败即停，不猜测。
@@ -95,7 +95,7 @@
 
 ## 问题 14：国内网站走代理打不开
 
-- 症状：百度/bilibili 等国内网站打不开（走代理被墙）
+- 症状：百度/bilibili 等国内网站打不开（错误走代理或代理路径不可达）
 - 根因：订阅 rules 缺国内直连规则
 - 解决：应用 `clash-cn-rules.patch`（私网/cn/GEOIP,CN 直连规则写入订阅模板）
 
@@ -103,10 +103,10 @@
 
 - 见问题 12（同一个 bug）
 
-## 问题 16：IP 被 GFW 封锁
+## 问题 16：公网 IP 在特定网络下持续不可达
 
 - 症状：客户端突然全部超时；本机 ping/22/80/443 全部 timeout；Lightsail 控制台实例 **Running**、防火墙正常
-- 判断：与"服务器宕机"区分——实例 Running 但网络全断 = 大概率 IP 被墙
+- 判断：先排除实例尚未启动完成、服务异常、防火墙或路由错误，以及临时 AWS 网络问题。只有服务和规则正常，并且从不同网络测试 22/80/443 等端口仍持续全部超时后，才将公网 IP 路由或可达性异常作为高概率判断
 - 解决：完整流程见 `DEPLOYMENT_GUIDE.md` Phase 8（经用户确认后换 Static IP → 重配域名/证书 → 重新验证与交付）
 - 换 IP 后：**所有订阅链接的域名段变化**（IP.sslip.io），必须重新把新链接发给所有用户
 
@@ -131,6 +131,38 @@
 - 症状：刚创建的新 Static IP 22/443 全 timeout
 - 根因：实例/网络初始化中
 - 解决：重启实例（Lightsail → Reboot）或等待 1-2 分钟再测
+
+## 问题 21：版本文件与实际 HiddifyPanel 包不一致
+
+- 症状：`/opt/hiddify-manager/VERSION` 显示 `12.3.3`，但 `importlib.metadata.version("hiddifypanel")` 返回其他版本
+- 风险：补丁可能被应用到错误源码，配置和面板行为也可能不一致
+- 处理：立即停止 patch 和配置流程，保留版本输出与安装日志；不要绕过检查或强行应用补丁。参考上游 [Hiddify-Manager #5434](https://github.com/hiddify/Hiddify-Manager/issues/5434) 核对安装状态，修复后重新运行版本、健康和订阅验证
+
+## 问题 22：`additional_configs_urls` 为空时订阅生成失败
+
+- 症状：订阅返回 500，日志出现 `AttributeError: 'NoneType' object has no attribute 'split'`
+- 根因：HiddifyPanel v12.3.3 的已报告上游问题；空的 `additional_configs_urls` 未按空列表处理
+- 处理：先保存脱敏日志并核对上游 [Hiddify-Manager #5495](https://github.com/hiddify/Hiddify-Manager/issues/5495) 的当前状态；本仓库暂不自动修改该处上游代码，避免未经回归的新补丁
+
+## 问题 23：此前可用，随后面板、订阅和全部节点同时超时
+
+- 症状：Reality、Hysteria2、订阅和面板在此前正常后同时变慢或超时；TCP 443 或 TLS 握手可能仍成功，但具体请求返回 503/504 或长时间无响应；切换网络和重启客户端后不恢复
+- 分层判断：`ping` 超时不能单独证明服务器离线；TCP 443 和 TLS 成功只证明公网路径与前端监听仍在。若管理路径和订阅路径返回 503/504，应继续检查 HAProxy/Nginx 后端、Hiddify 服务和操作系统资源
+- 本次已验证案例：1GB 实例当时仅约 16MB 可用内存、没有 swap，负载持续上升且 `vmstat` 显示大量阻塞进程和 92–96% I/O wait；HiddifyPanel 出现 SIGABRT/core dump，同时存在多个系统更新相关进程。停止当时的额外负载并启用 2GB swap 后，面板由 503/504 恢复为 302，订阅恢复为 200，I/O wait 回落
+- 结论边界：证据支持“服务器资源压力和 I/O 阻塞导致后端失去响应”，并表明 `unattended-upgrades` 是当时的重要并发负载；它不能证明自动安全更新是所有同类故障的唯一根因，也不能仅凭一次低内存读数自动重启服务
+- 只读诊断：
+
+  ```bash
+  sudo bash /opt/vpn-deploy/scripts/diagnose-resources.sh "24 hours ago"
+  sudo bash /opt/vpn-deploy/scripts/health-check.sh /opt/vpn-deploy/deployment.yaml
+  sudo bash /opt/vpn-deploy/scripts/verify-subscription.sh /opt/vpn-deploy/deployment.yaml
+  ```
+
+- 重点关联同一时间窗口内的：`MemAvailable`、swap、`vmstat` 的 `b/wa`、服务 `NRestarts/Result`、core dump/OOM 记录、占用最高的进程、自动安全更新日志，以及管理和订阅 URL 的响应码
+- 恢复：先向用户报告证据并确认干预。若系统更新正在造成明显资源压力，优先让它正常结束或通过 systemd 正常停止，不直接强杀包管理进程；压力解除后只有相关服务仍不响应时才重启对应服务。随后运行 `dpkg --audit`，重新执行健康与订阅验证
+- 预防：默认 1GB 方案在安装阶段创建 2GB swap；保留 Ubuntu 自动安全更新。如果用户明确关闭自动安全更新，必须另行安排系统补丁。若加 swap 后仍反复出现资源压力，再评估减少未使用组件或升级实例规格。Ubuntu 对自动安全更新的说明见 [Security updates](https://documentation.ubuntu.com/security/security-updates/)
+- 禁止：不部署“低于固定内存阈值就执行 `drop_caches` 并重启面板”的 cron。Linux 会自行回收可回收缓存，内核文档明确说明 `drop_caches` 不适合作为缓存增长控制手段，且可能增加后续 I/O 和 CPU 开销；单指标自动重启也可能把短时压力变成服务中断。见 [Linux `/proc/sys/vm/` 文档](https://kernel.org/doc/html/v6.7/admin-guide/sysctl/vm.html#drop-caches)
+- 旧部署清理：若健康检查发现 `/usr/local/bin/memory-watchdog.sh` 的 root cron，先向用户说明该任务会自动清缓存和重启面板；获得确认后再删除对应 cron 行和脚本文件，随后重新运行健康检查
 
 ## 诊断速查命令
 

@@ -100,6 +100,26 @@ while IFS=$'\t' read -r user_uuid user_name; do
     continue
   fi
 
+  if "$PYTHON_BIN" - "$clash_file" <<'PY'
+import sys
+
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    config = yaml.safe_load(stream)
+if not isinstance(config, dict):
+    raise SystemExit("Clash 配置根节点不是 mapping")
+if not isinstance(config.get("proxies"), list) or not config["proxies"]:
+    raise SystemExit("Clash 配置缺少非空 proxies 列表")
+if not isinstance(config.get("rules"), list) or not config["rules"]:
+    raise SystemExit("Clash 配置缺少非空 rules 列表")
+PY
+  then
+    pass "$user_name: Clash/Mihomo YAML 结构有效"
+  else
+    fail "$user_name: Clash/Mihomo YAML 结构无效"
+  fi
+
   if curl --fail --silent --show-error --location \
     --connect-timeout 10 --max-time 30 --dump-header "$header_file" \
     --output "$auto_file" "$auto_url"; then

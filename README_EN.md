@@ -158,6 +158,7 @@ If you choose the defaults, the current template uses:
 | Region | Oregon (`us-west-2`) |
 | OS | Ubuntu 22.04 LTS |
 | Plan | At least 1 GB RAM; the template assumes a tier with about 2 TB monthly transfer |
+| Resource buffer | Creates 2 GB swap by default |
 | Panel | HiddifyPanel v12.3.3 |
 | Protocols | Reality + Hysteria2 |
 | Domain | Free `sslip.io` domain |
@@ -220,6 +221,7 @@ The default workflow follows these principles:
 - Sensitive deployment information is stored only in the Git-ignored `.local/` directory
 - Every user receives separate subscription credentials
 - HiddifyPanel files are backed up before modification, and patches stop on version mismatch
+- A 2 GB swap file is created by default to buffer transient memory pressure on 1 GB instances
 - Resource deletion, non-default user deletion, upgrades, and rollbacks require confirmation
 - All critical services must pass real checks before delivery
 

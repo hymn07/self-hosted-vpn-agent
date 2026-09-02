@@ -49,7 +49,8 @@ branding:
 
 security:
   disable_password_ssh: true
-  enable_auto_updates: true
+  enable_auto_updates: true    # Ubuntu 系统安全更新；关闭后需自行安排系统补丁
+  swap_size_gb: 2              # 1GB 实例的资源缓冲；设为 0 可跳过创建
   delete_default_user: true
   quota_reserve_ratio: 0.10    # 建议至少保留 10% 套餐流量余量
 

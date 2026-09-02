@@ -4,7 +4,7 @@
 
 ```
 第 1 层：AWS Lightsail 防火墙（实例层面，主防线）
-         只开 TCP 22/80/443 + UDP 443 + UDP 35952-35953
+         只开 TCP 22/80/443 + UDP 443；启用 Hysteria2 时再开 UDP 35952-35953
          数据库、Redis、面板内部端口（9000 等）外部不可达
 
 第 2 层：服务器内 iptables（Hiddify 自动管理）
@@ -19,7 +19,9 @@
          管理员强密码（≥12 位，首次设置）
          每用户独立凭证（UUID + 订阅链接），无匿名用户（default 已删除）
 
-第 5 层：自动安全更新（unattended-upgrades）
+第 5 层：资源与系统维护
+         默认 2GB swap 缓冲 1GB 实例的突发内存压力
+         unattended-upgrades 负责 Ubuntu 系统安全更新
 ```
 
 ## 明确不做的事
@@ -34,7 +36,8 @@
 2. 真实凭据（IP、UUID、admin path、API key、订阅 URL）只写入 `.local/`（gitignored），绝不进 tracked 文件
 3. 任何不可逆操作（删 Static IP、删用户、改防火墙）执行前明确告知用户
 4. 修改 Hiddify 文件前先备份；patch 失败立即停止
-5. Lightsail 入站规则只允许 TCP 22/80/443、UDP 443 与启用 Hysteria2 时的 UDP 35952-35953；3306/6379/9000 等内部端口不得公开
+5. Lightsail 入站规则必须与已启用协议一致：TCP 22/80/443、UDP 443；仅启用 Hysteria2 时开放 UDP 35952-35953；3306/6379/9000 等内部端口不得公开
+6. 资源异常先执行只读诊断；不根据一次低内存读数自动清缓存或重启服务
 
 ## 面板访问保护
 

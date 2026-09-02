@@ -20,13 +20,25 @@ fail() {
 [ -f "$CONFIG_FILE" ] || fail "找不到部署配置: $CONFIG_FILE"
 [ -f "$CONFIG_TOOL" ] || fail "找不到配置解析器: $CONFIG_TOOL"
 "$PYTHON_BIN" "$CONFIG_TOOL" validate "$CONFIG_FILE" >/dev/null || exit 1
+EXPECTED_VERSION="$("$PYTHON_BIN" "$CONFIG_TOOL" get "$CONFIG_FILE" hiddify.version)"
 
 VERSION=""
 if [ -f "$HIDDIFY_ROOT/VERSION" ]; then
   IFS= read -r VERSION <"$HIDDIFY_ROOT/VERSION"
 fi
-[ "$VERSION" = "12.3.3" ] || fail "Hiddify 版本 $VERSION 不受支持；当前只支持 12.3.3"
-echo "Hiddify 版本: $VERSION"
+[ "$VERSION" = "$EXPECTED_VERSION" ] ||
+  fail "Hiddify 版本文件为 ${VERSION:-未知}，期望 $EXPECTED_VERSION"
+if ! PACKAGE_VERSION="$("$PYTHON_BIN" - <<'PY'
+from importlib.metadata import version
+
+print(version("hiddifypanel"))
+PY
+)"; then
+  fail "无法读取实际安装的 hiddifypanel Python 包版本"
+fi
+[ "$PACKAGE_VERSION" = "$EXPECTED_VERSION" ] ||
+  fail "实际 hiddifypanel Python 包版本为 $PACKAGE_VERSION，期望 $EXPECTED_VERSION；停止应用补丁"
+echo "Hiddify 版本文件与 Python 包一致: $EXPECTED_VERSION"
 
 WORK_DIR="$(mktemp -d)" || fail "无法创建临时目录"
 BACKUP_DIR="$HIDDIFY_ROOT/vpn-agent-backups/$(date +%Y%m%d-%H%M%S)"

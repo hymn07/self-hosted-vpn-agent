@@ -11,7 +11,7 @@ sudo bash /opt/vpn-deploy/scripts/apply-patches.sh \
 
 应用器会：
 
-- 校验 Hiddify 精确版本；
+- 同时校验 Hiddify 版本文件和实际安装的 `hiddifypanel` Python 包版本；
 - 从 Hiddify 配置动态读取节点前缀和订阅名；
 - 检查每个目标文件；
 - 先运行 `patch --dry-run`；

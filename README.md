@@ -158,6 +158,7 @@ https://your-domain.example/<client-path>/<user-id>/auto/
 | 区域 | Oregon（`us-west-2`） |
 | 系统 | Ubuntu 22.04 LTS |
 | 套餐 | 至少 1GB 内存；模板参考约 2TB 月流量的档位 |
+| 资源保护 | 默认创建 2GB swap |
 | 面板 | HiddifyPanel v12.3.3 |
 | 协议 | Reality + Hysteria2 |
 | 域名 | 免费 `sslip.io` |
@@ -220,6 +221,7 @@ AWS 的套餐价格、区域流量包和超额单价可能变化。创建资源�
 - 敏感部署信息只保存在被 Git 忽略的 `.local/`
 - 每个用户使用独立订阅凭据
 - 修改 HiddifyPanel 文件前先备份，版本不匹配时停止应用补丁
+- 默认创建 2GB swap，降低 1GB 实例在突发内存压力下失去响应的风险
 - 删除资源、删除非默认用户、升级或回滚前必须再次确认
 - 所有关键服务必须实际检查通过后才能交付
 

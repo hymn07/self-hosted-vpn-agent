@@ -32,6 +32,7 @@ AWS Lightsail / Ubuntu 22.04
  ├─ HAProxy/Nginx：HTTPS、面板、订阅
  ├─ Xray：Reality / TCP 443
  ├─ Sing-box：Hysteria2 / UDP 35952-35953
+ ├─ 可配置 swap：默认 2GB，缓冲 1GB 实例的突发内存压力
  └─ 每账户独立 UUID、额度、重置周期
 ```
 
@@ -46,6 +47,7 @@ example -> 用户一次确认 -> .local/deployment.yaml
                               ├─ preflight
                               ├─ configure-domain/protocols/users
                               ├─ patch 参数渲染
+                              ├─ SSH、swap 与系统更新加固
                               ├─ health/subscription 验证
                               └─ 本次部署的交付文档
 ```
@@ -68,7 +70,7 @@ example -> 用户一次确认 -> .local/deployment.yaml
 | TCP | 80 | ACME / HTTP |
 | TCP | 443 | HTTPS / Reality |
 | UDP | 443 | HTTP/3 |
-| UDP | 35952-35953 | Hysteria2 |
+| UDP | 35952-35953 | Hysteria2（仅启用时开放） |
 
 数据库、Redis 和面板内部端口不得暴露。Hiddify 管理 iptables，因此不叠加 UFW；公网边界由 Lightsail Firewall 控制。最终验证严格校验 TLS，不以 `curl -k` 结果作为交付依据。
 
@@ -76,7 +78,7 @@ example -> 用户一次确认 -> .local/deployment.yaml
 
 仓库固定 v12.3.3，原因是四个补丁包含上游文件上下文，必须与精确源码匹配。应用器会：
 
-1. 校验 `/opt/hiddify-manager/VERSION`；
+1. 同时校验 `/opt/hiddify-manager/VERSION` 与实际安装的 `hiddifypanel` Python 包版本；
 2. 节点前缀与订阅名从 Hiddify 配置动态读取；
 3. dry-run 全部目标；
 4. 备份涉及文件；
@@ -87,6 +89,8 @@ example -> 用户一次确认 -> .local/deployment.yaml
 ## 默认方案
 
 默认 Oregon、参考 $7 的 1GB/2TB 档、3 × 500GB/月、Reality + Hysteria2 和 sslip.io，是为了减少首次部署决策，不是产品限制。AWS 区域流量包和超额单价不同且会调整，因此最终成本字段必须来自创建时控制台。
+
+1GB 默认方案同时配置 2GB swap，防止短时内存压力直接演变为服务失去响应。Ubuntu 自动安全更新默认保留；用户可以将其关闭，但需自行建立定期补丁维护流程。
 
 ## 已知限制
 

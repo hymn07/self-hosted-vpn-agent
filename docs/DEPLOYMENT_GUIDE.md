@@ -102,8 +102,17 @@ ssh <SSH_OPTIONS> ubuntu@<IP> \
 
 ```bash
 sudo test "$(cat /opt/hiddify-manager/VERSION)" = "12.3.3"
+/opt/hiddify-manager/.venv313/bin/python - <<'PY'
+from importlib.metadata import version
+
+actual = version("hiddifypanel")
+assert actual == "12.3.3", f"hiddifypanel package={actual}, expected=12.3.3"
+print(actual)
+PY
 sudo systemctl is-active hiddify-panel hiddify-haproxy
 ```
+
+版本文件和实际 Python 包必须同时为 `12.3.3`。若不一致，停止应用补丁并按 `TROUBLESHOOTING.md` 的版本不一致问题诊断，不要把补丁套到其他包版本。
 
 若安装器的 `cli_progress` 高 CPU 且长期不前进，按 `TROUBLESHOOTING.md` 问题 2 诊断；不要盲目 `pkill -f`。
 
@@ -153,7 +162,11 @@ sudo bash /opt/vpn-deploy/scripts/harden-server.sh \
   /opt/vpn-deploy/deployment.yaml
 ```
 
-此脚本按配置禁用 SSH 密码认证并启用 Ubuntu 自动安全更新。运行后新开一个 SSH 连接验证，旧会话在验证前保持打开。
+此脚本按配置禁用 SSH 密码认证、创建 swap，并配置 Ubuntu 自动安全更新。默认 1GB 实例会先创建 2GB swap，再运行可能消耗额外内存和 I/O 的系统包操作。运行后新开一个 SSH 连接验证，旧会话在验证前保持打开。
+
+`unattended-upgrades` 用于 Ubuntu 系统安全更新。若配置中将 `security.enable_auto_updates` 设为 `false`，Agent 必须提醒用户另行安排系统安全补丁；不要把关闭安全更新描述为零代价优化。
+
+脚本不会安装“低于固定内存阈值就清缓存并重启面板”的看门狗。单次 `MemAvailable` 偏低不足以证明服务故障，自动重启可能制造额外中断。
 
 ### 【用户操作 4】设置面板密码
 
@@ -174,7 +187,15 @@ sudo bash /opt/vpn-deploy/scripts/verify-subscription.sh \
   /opt/vpn-deploy/deployment.yaml
 ```
 
-两者必须零失败。再从 Agent 本机确认 TCP 22/80/443 可达，并让用户确认 Lightsail 规则没有数据库、Redis、9000 等额外端口。UDP 可达性不能仅靠普通 TCP 扫描推断。
+两者必须零失败，健康检查还会确认配置要求的 swap 已启用。再从 Agent 本机确认 TCP 22/80/443 可达，并让用户确认 Lightsail 规则与配置一致：没有数据库、Redis、9000 等额外端口，且仅在启用 Hysteria2 时开放 UDP 35952-35953。UDP 可达性不能仅靠普通 TCP 扫描推断。
+
+如果面板、订阅和全部协议节点在此前可用后同时变慢或超时，先在服务器运行只读诊断：
+
+```bash
+sudo bash /opt/vpn-deploy/scripts/diagnose-resources.sh "24 hours ago"
+```
+
+该脚本只读取服务、端口、进程、内存、swap、I/O wait 和近期日志，不会重启服务、停止更新、修改配置或安装软件。结合故障开始时间判断后，再向用户提出恢复动作并单独确认。
 
 ## Phase 7：生成并下载交付物
 
@@ -204,9 +225,9 @@ Agent 检查三个文件完整后，再安全删除服务器临时交付目录�
 - 如何增删账户、修改额度和查看费用；
 - `.local/` 不能上传 Git 或公开分享。
 
-## Phase 8：换 IP
+## Phase 8：公网 IP 持续不可达时更换 Static IP
 
-只有在实例 Running、规则正确且多网络测试均显示所有端口超时后，才把“IP 被封”作为高概率判断。
+先排除实例尚未启动完成、服务未运行、防火墙或路由错误，以及临时 AWS 网络异常。只有实例保持 Running、服务和规则正确，并且从不同网络测试 22/80/443 等公网端口仍持续全部超时后，才将公网 IP 路由或可达性异常作为高概率判断。
 
 删除 Static IP 会造成中断，必须再次得到用户确认。用户创建并绑定新 IP 后：
 

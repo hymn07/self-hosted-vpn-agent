@@ -61,6 +61,7 @@ https://<DOMAIN>/<ADMIN_PATH>/
 | `geoip_cn not found` | 删除客户端旧缓存后重新导入；仍失败则重跑订阅验证 |
 | 订阅链接失效 | 在面板确认账户启用、未超额、未过期 |
 | 面板打不开 | 等待实例重启完成；检查 TLS、hiddify-panel 与 haproxy |
+| 此前可用，后来面板、订阅和全部节点同时超时 | 不要直接重装或换 IP；让 Agent 先运行 `diagnose-resources.sh` 做只读资源诊断 |
 | IP 更换 | sslip.io 链接会变化；重新生成并分发全部交付物 |
 
 ## 安全提醒

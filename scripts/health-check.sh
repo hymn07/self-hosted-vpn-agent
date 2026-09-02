@@ -23,8 +23,10 @@ check() {
 "$PYTHON_BIN" "$CONFIG_TOOL" validate "$CONFIG_FILE" >/dev/null || exit 1
 SERVER_IP="$("$PYTHON_BIN" "$CONFIG_TOOL" get "$CONFIG_FILE" server.ip)"
 DOMAIN_MODE="$("$PYTHON_BIN" "$CONFIG_TOOL" get "$CONFIG_FILE" domain.mode)"
+EXPECTED_VERSION="$("$PYTHON_BIN" "$CONFIG_TOOL" get "$CONFIG_FILE" hiddify.version)"
 EXPECT_REALITY="$("$PYTHON_BIN" "$CONFIG_TOOL" get "$CONFIG_FILE" protocols.reality)"
 EXPECT_HYSTERIA2="$("$PYTHON_BIN" "$CONFIG_TOOL" get "$CONFIG_FILE" protocols.hysteria2)"
+SWAP_SIZE_GB="$("$PYTHON_BIN" "$CONFIG_TOOL" get "$CONFIG_FILE" security.swap_size_gb)"
 if [ "$DOMAIN_MODE" = "custom" ]; then
   DOMAIN="$("$PYTHON_BIN" "$CONFIG_TOOL" get "$CONFIG_FILE" domain.custom_domain)"
 else
@@ -32,6 +34,28 @@ else
 fi
 
 echo "=== Hiddify 健康检查 ==="
+
+VERSION=""
+if [ -f "$HIDDIFY_ROOT/VERSION" ]; then
+  IFS= read -r VERSION <"$HIDDIFY_ROOT/VERSION"
+fi
+if [ "$VERSION" = "$EXPECTED_VERSION" ]; then
+  check "Hiddify 版本文件 $VERSION" 0
+else
+  check "Hiddify 版本文件 ${VERSION:-未知}（期望 $EXPECTED_VERSION）" 1
+fi
+PACKAGE_VERSION="$("$PYTHON_BIN" - <<'PY' 2>/dev/null
+from importlib.metadata import version
+
+print(version("hiddifypanel"))
+PY
+)"
+package_rc=$?
+if [ "$package_rc" -eq 0 ] && [ "$PACKAGE_VERSION" = "$EXPECTED_VERSION" ]; then
+  check "hiddifypanel Python 包 $PACKAGE_VERSION" 0
+else
+  check "hiddifypanel Python 包 ${PACKAGE_VERSION:-未知}（期望 $EXPECTED_VERSION）" 1
+fi
 
 for service in hiddify-panel hiddify-haproxy hiddify-nginx hiddify-redis; do
   systemctl is-active --quiet "$service" 2>/dev/null
@@ -97,6 +121,30 @@ if [ "${mem_avail:-0}" -gt 100 ]; then
   check "可用内存 ${mem_avail}MB" 0
 else
   check "可用内存不足" 1
+fi
+if [ "$SWAP_SIZE_GB" -gt 0 ]; then
+  required_swap_bytes=$((SWAP_SIZE_GB * 1024 * 1024 * 1024))
+  active_swap_bytes="$(swapon --bytes --show=NAME,SIZE --noheadings 2>/dev/null |
+    awk '$1 == "/swapfile" {print $2; exit}')"
+  if [ "${active_swap_bytes:-0}" -ge "$required_swap_bytes" ]; then
+    check "配置要求的 ${SWAP_SIZE_GB}GB swap 已启用" 0
+  else
+    check "配置要求的 ${SWAP_SIZE_GB}GB swap 未启用或容量不足" 1
+  fi
+fi
+vm_sample="$(vmstat 1 2 2>/dev/null | tail -1)"
+blocked_processes="$(awk '{print $2}' <<<"$vm_sample")"
+io_wait="$(awk '{print $16}' <<<"$vm_sample")"
+if [[ "${blocked_processes:-}" =~ ^[0-9]+$ ]] && [[ "${io_wait:-}" =~ ^[0-9]+$ ]] &&
+  [ "$blocked_processes" -le 1 ] && [ "$io_wait" -lt 50 ]; then
+  check "资源压力采样正常（blocked=$blocked_processes, iowait=$io_wait%）" 0
+else
+  check "资源压力采样异常（blocked=${blocked_processes:-未知}, iowait=${io_wait:-未知}%）" 1
+fi
+if crontab -u root -l 2>/dev/null | grep -Fq '/usr/local/bin/memory-watchdog.sh'; then
+  check "发现会按内存阈值自动重启面板的旧定时任务" 1
+else
+  check "未发现自动重启面板的旧内存看门狗" 0
 fi
 disk_free="$(df -m / | awk 'NR==2{print $4}')"
 if [ "${disk_free:-0}" -gt 2000 ]; then

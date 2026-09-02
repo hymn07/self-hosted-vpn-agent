@@ -16,6 +16,7 @@
    - 协议：Reality + Hysteria2
    - 域名：免费 sslip.io
    - 节点前缀：US；订阅名：Private VPN
+   - 资源保护：2GB swap
 5. 告诉用户：“回复‘按默认’即可；要修改时请一次性列出修改项。默认值只是建议，不是限制。”
 6. 用户确认后只编辑 `.local/deployment.yaml`，重新运行 `validate` 和 `summary`，把摘要回显给用户。之后所有脚本、验证和交付物都读取这一个文件；禁止在命令或文档中另写一套参数。
 
@@ -45,7 +46,7 @@ preflight    -> 配置、SSH、系统规格和端口检查
 stage        -> 上传脚本、补丁和已确认配置
 install      -> 安装固定 Hiddify v12.3.3
 configure    -> 协议、账户、补丁、apply_configs/apply_users
-harden       -> SSH 密钥认证与自动安全更新
+harden       -> SSH 密钥认证、swap 与系统安全更新
 validate     -> 健康检查和每账户订阅检查全部 PASS
 deliver      -> 生成并下载 .local/ 部署资料
 ```
@@ -57,6 +58,7 @@ deliver      -> 生成并下载 .local/ 部署资料
 - `scripts/configure-users.py`
 - `scripts/apply-patches.sh`
 - `scripts/harden-server.sh`
+- `scripts/diagnose-resources.sh`
 - `scripts/health-check.sh`
 - `scripts/verify-subscription.sh`
 - `scripts/generate-deliverables.py`
@@ -70,6 +72,7 @@ deliver      -> 生成并下载 .local/ 部署资料
 - 私钥不上传到服务器。`.local/deployment.yaml` 上传副本前必须移除或清空 `server.ssh_key_path`。
 - Patch 仅用于精确版本 v12.3.3；先 dry-run、再逐文件备份；任何失败立即停止。
 - 重跑脚本必须幂等。删除 Static IP、删除非 default 账户、升级或回滚等破坏性动作必须再次得到确认。
+- 内存不足时先运行只读资源诊断；不得只凭一次可用内存读数自动执行 `drop_caches` 或重启 Hiddify 服务。
 - 最终验证禁止用 `curl -k` 掩盖证书问题；诊断时若临时跳过 TLS，必须明确标为诊断，不得据此判定通过。
 - 部署状态和秘密仅保存在 `.local/`，权限尽量为 0600。
 
@@ -81,7 +84,9 @@ deliver      -> 生成并下载 .local/ 部署资料
 |---|---|
 | 安装器 `cli_progress` 高 CPU 卡住 | 问题 2；确认进程后终止并用 `--no-gui --no-log` 恢复 |
 | 面板 500 / AdminUser AttributeError | 核对 v12.3.3 补丁是否已应用及面板日志 |
-| 实例 Running 但所有端口 timeout | 检查防火墙/路由；确认 IP 被封后走换 IP 流程 |
+| 版本文件与 `hiddifypanel` 包版本不一致 | 立即停止 patch；保留安装日志并按 TROUBLESHOOTING 版本不一致问题诊断 |
+| 面板、订阅和全部节点同时变慢或超时 | 先运行只读资源诊断，检查内存、swap、I/O wait、服务重启和系统更新活动，再决定恢复动作 |
+| 实例 Running 但所有端口 timeout | 先排除启动、服务、防火墙和临时网络异常；多网络复测后若仍不可达，再走 Static IP 更换流程 |
 | `geoip_cn not found` | 保持 country=UN 并检查 clash-cn-rules patch |
 | 国内站点错误走代理 | 检查订阅中的 `GEOIP,CN,DIRECT` |
 
@@ -93,9 +98,10 @@ deliver      -> 生成并下载 .local/ 部署资料
 
 - [ ] `scripts/health-check.sh` 零失败；
 - [ ] `scripts/verify-subscription.sh` 对配置中的每个账户零失败；
-- [ ] Lightsail 入站规则只有 TCP 22/80/443、UDP 443 和 UDP 35952-35953；
+- [ ] Lightsail 入站规则与已启用协议一致：TCP 22/80/443、UDP 443；仅启用 Hysteria2 时开放 UDP 35952-35953；
 - [ ] 无 `default` 匿名账户，每个配置账户有独立 UUID 与正确配额；
 - [ ] 公网 HTTPS 证书严格验证通过；
+- [ ] 配置要求的 swap 已启用；
 - [ ] `.local/SECRETS.md` 含后台和每账户两种订阅；
 - [ ] `.local/USER_GUIDE.md` 是针对本次部署生成的使用说明；
 - [ ] `.local/DEPLOYMENT_REPORT.md` 记录版本、区域、账户和最终验证结论；

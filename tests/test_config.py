@@ -33,6 +33,25 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertEqual([u["name"] for u in users], ["user1", "user2", "user3"])
         self.assertEqual([u["quota_gb"] for u in users], [500.0, 500.0, 500.0])
 
+    def test_default_one_gb_plan_has_swap_and_security_updates(self) -> None:
+        cfg = self.load(self.base)
+        self.assertEqual(cfg["security"]["swap_size_gb"], 2)
+        self.assertTrue(cfg["security"]["enable_auto_updates"])
+
+    def test_swap_size_must_be_a_non_negative_integer(self) -> None:
+        for invalid in (-1, 1.5):
+            with self.subTest(invalid=invalid):
+                data = copy.deepcopy(self.base)
+                data["security"]["swap_size_gb"] = invalid
+                with self.assertRaisesRegex(ConfigError, "swap_size_gb"):
+                    self.load(data)
+
+    def test_existing_config_without_swap_setting_gets_safe_default(self) -> None:
+        data = copy.deepcopy(self.base)
+        del data["security"]["swap_size_gb"]
+        cfg = self.load(data)
+        self.assertEqual(cfg["security"]["swap_size_gb"], 2)
+
     def test_any_account_can_override_defaults(self) -> None:
         data = copy.deepcopy(self.base)
         data["users"]["accounts"] = [
